@@ -160,11 +160,34 @@ Core coreDesign(Transformer transformerData){
 }
 
 Window windowDesign(Transformer transformerData){
+  // Window Space Factor
+  Window ans;
 
+  if(transformerData.kVA <200){
+    ans.Kw = 8/(30+transformerData.kVA);
+  }else if(transformerData.kVA <700){
+    ans.Kw = 10/(30+transformerData.kVA);
+  }else if(transformerData.kVA <1000){
+    ans.Kw = 12/(30+transformerData.kVA);
+  }else{
+    ans.Kw = 0.21;
+  }
+
+  readFloat("Enter the value of Current Density(in A/mm^2)",&ans.currentDensity);
+
+
+  return ans;
 }
 
 Yoke yokeDesign(Transformer transformerData){
+  Yoke ans;
 
+  ans.Ayoke = 1.2 * transformerData.Core.Ai;
+  printf("\n=> Gross area of Yoke = %f m^2", ans.Ayoke/0.9);
+  ans.Dy = transformerData.Core.p;
+  ans.Hy = ans.Ayoke/(0.9*ans.Dy);
+
+  return ans;
 }
 
 Frame frameDesign(Transformer transformerData){

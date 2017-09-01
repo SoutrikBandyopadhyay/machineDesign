@@ -30,12 +30,27 @@ typedef struct _core{
 } Core;
 
 typedef struct _window{
+  float Kw; //Space Factor
+  float currentDensity; //in A/mm^2
+  float Aw; //Area of Window
+  float Hw;
+  float Ww;
+  float ratio;
+  float distanceBetweenCores;
 
 } Window;
 
 typedef struct _yoke{
-
+  float Ayoke;
+  float Dy;
+  float Hy;
 } Yoke;
+
+typedef struct _frame{
+  float H;
+  float W;
+  float D;
+} Frame;
 
 typedef struct _lv{
 
@@ -54,8 +69,9 @@ typedef struct _transformer{
   float maxTappings;
 
   Core Core;
-  Window W;
-  Yoke Y;
+  Window Window;
+  Yoke Yoke;
+  Frame Frame;
   LVwindingData LV;
   HVwindingData HV;
 
@@ -72,6 +88,9 @@ void readInt(char *c,int *f){
   printf("%s : ",c);
   scanf("%d",f);
 }
+
+
+
 
 Core coreDesign(Transformer transformerData){
   Core ans;
@@ -140,10 +159,27 @@ Core coreDesign(Transformer transformerData){
   return ans;
 }
 
+Window windowDesign(Transformer transformerData){
+
+}
+
+Yoke yokeDesign(Transformer transformerData){
+
+}
+
+Frame frameDesign(Transformer transformerData){
+  Frame ans;
+
+  ans.H = transformerData.Window.Hw + 2*transformerData.Yoke.Hy;
+  ans.W = 2*transformerData.Window.distanceBetweenCores + transformerData.Core.p;
+  ans.D = transformerData.Yoke.Dy;
+
+  return ans;
+}
 
 int main(int argc, char const *argv[]) {
   /* code */
-
+  system("cls");
   Transformer transformerData;
 
   printf("============================\n");
@@ -160,14 +196,29 @@ int main(int argc, char const *argv[]) {
 
 
   //________Core Design__________________
-  // system("cls");
-  printf("\n============================\n");
+
+  printf("\n\n============================\n");
   printf("         CORE DESIGN        \n");
   printf("============================\n");
-
   transformerData.Core = coreDesign(transformerData);
 
+  //_______Window Design_____________
+  printf("\n\n============================\n");
+  printf("       WINDOW DESIGN        \n");
+  printf("============================\n");
+  transformerData.Window = windowDesign(transformerData);
 
+  //_______Yoke Design_______________
+  printf("\n\n============================\n");
+  printf("         YOKE DESIGN        \n");
+  printf("============================\n");
+  transformerData.Yoke = yokeDesign(transformerData);
+
+  //______Frame Design_______________
+  printf("\n\n============================\n");
+  printf("         FRAME DESIGN       \n");
+  printf("============================\n");
+  transformerData.Frame = frameDesign(transformerData);
 
 
   return 0;

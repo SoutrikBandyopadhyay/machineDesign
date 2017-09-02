@@ -35,7 +35,7 @@ typedef struct _window{
   float Aw; //Area of Window
   float Hw;
   float Ww;
-  float ratio;
+  float ratio; // Hw and Ww ka ratio
   float distanceBetweenCores;
 
 } Window;
@@ -89,7 +89,20 @@ void readInt(char *c,int *f){
   scanf("%d",f);
 }
 
-
+int mToMM(float num){
+  int ans;
+  float temp;
+  temp = num*1000;
+  ans  = (int)temp;
+  float decimal;
+  decimal = temp - (float)ans;
+  decimal*= 10;
+  if(decimal/1< 5){
+    return ans;
+  }else{
+    return ans+1;
+  }
+}
 
 
 Core coreDesign(Transformer transformerData){
@@ -175,6 +188,18 @@ Window windowDesign(Transformer transformerData){
 
   readFloat("Enter the value of Current Density(in A/mm^2)",&ans.currentDensity);
 
+  //Aw calculation
+  ans.Aw = transformerData.kVA/(3.33*transformerData.frequency*transformerData.Core.Bm*ans.Kw*ans.currentDensity*1000*transformerData.Core.Ai);
+  printf("\n=> Window area = %.4f m^2",ans.Aw);
+
+  readFloat("Enter the value of ratio of Hw and Ww",&ans.ratio);
+  ans.Ww = sqrt(ans.Aw/ans.ratio);
+  ans.Hw = ans.ratio*ans.Ww;
+  ans.distanceBetweenCores = ans.Ww + transformerData.Core.d;
+  printf("\n\n _____________Window Dimensions____________");
+  printf("\n => Width of Window = %d mm",mToMM(ans.Ww));
+  printf("\n => Height of Window = %d mm",mToMM(ans.Hw));
+  printf("\n => Distance between adjacent Core centers = %d mm",mToMM(ans.distanceBetweenCores));
 
   return ans;
 }
@@ -183,9 +208,14 @@ Yoke yokeDesign(Transformer transformerData){
   Yoke ans;
 
   ans.Ayoke = 1.2 * transformerData.Core.Ai;
-  printf("\n=> Gross area of Yoke = %f m^2", ans.Ayoke/0.9);
+  printf("\n=> Net area of Yoke = %f m^2", ans.Ayoke);
+  printf("\n=> Gross area of Yoke = %f m^2", ans.Ayoke/transformerData.Core.Ki);
   ans.Dy = transformerData.Core.p;
-  ans.Hy = ans.Ayoke/(0.9*ans.Dy);
+  ans.Hy = ans.Ayoke/(transformerData.Core.Ki*ans.Dy);
+
+  printf("\n\n _____________Yoke Dimensions____________");
+  printf("\n => Depth of Yoke = %d mm",mToMM(ans.Dy));
+  printf("\n => Height of Yoke = %d mm",mToMM(ans.Hy));
 
   return ans;
 }

@@ -74,6 +74,36 @@ typedef struct _hv{
 
 } HVwindingData;
 
+typedef struct _resistance{
+  float pu;
+  float absolute;
+} Resistance;
+
+typedef struct _reactance{
+  float pu;
+  float absolute;
+} Reactance;
+
+
+typedef struct _impedance{
+  Resistance R;
+  Reactance X;
+  float pu;
+  float absolute;
+} Impedance;
+
+typedef struct _regulation{
+  float value;
+  float pf;
+
+} Regulation;
+
+typedef struct _losses{
+  float CoreLoss;
+  float CopperLoss;
+} Losses;
+
+
 typedef struct _transformer{
   float kVA;
   float Vp; //Primary HV side Voltage(in KV)
@@ -97,6 +127,13 @@ typedef struct _transformer{
   Frame Frame;
   LVwindingData LV;
   HVwindingData HV;
+
+  Impedance Z;
+  Regulation Regulation;
+  Losses Losses;
+  float percentLoading;
+  float efficiency;
+
 
 } Transformer;
 
@@ -276,6 +313,7 @@ LVwindingData lvDesign(Transformer transformerData){
   ans.x2 += ans.conductorInsulation;
   printf("\n=> Dimensions of Insulated conductors = %f x %f mm",ans.x1,ans.x2);
 
+
   //Helical Winding
   printf("\n__________For Helical Winding__________");
   readInt("Enter the number of layers",&ans.layers);
@@ -308,6 +346,47 @@ LVwindingData lvDesign(Transformer transformerData){
   return ans;
 }
 
+HVwindingData hvDesign(Transformer transformerData){
+
+}
+
+Resistance resistanceCalc(Transformer transformerData){
+  Resistance ans;
+  float Dm1,Dm2;
+  float Lmtp,Lmts;
+  float Rs,Rp;
+
+  Dm1 = (transformerData.HV.Di + transformerData.HV.Do)/2;
+  Lmtp = pi*Dm1*0.001;//in m
+  Rp = (transformerData.HV.turnsPerPhase * 0.021 * Lmtp)/transformerData.HV.Ap;
+
+  Dm2 = (transformerData.LV.Di + transformerData.LV.Do)/2;
+  Lmts = pi*Dm2*0.001;//in m
+  Rs = (transformerData.LV.turnsPerPhase * 0.021 * Lmts)/transformerData.LV.As;
+
+  ans.absolute = Rp + pow((HV.turnsPerPhase/LV.turnsPerPhase),2) * Rs;
+  ans.pu = (ans.absolute*transformerData.IpPhase)/transformerData.VpPhase;
+  return ans;
+}
+
+
+Reactance reactanceCalc(Transformer transformerData){
+  Reactance ans;
+  float Dm;
+  float Lmt;
+  float Lc;
+  float Xp;
+
+  Dm = (transformerData.LV.Di+transformerData.HV.Do)/2;
+  Lmt = pi*Dm*0.001; // in m
+  Lc = (transformerData.LV.axialDepth + transformerData.HV.axialDepth)/2;
+
+  Xp = (2*pi*transformerData.frequency*muo*pow(transformerData.HV.turnsPerPhase,2)*Lmt*(transformerData.HV.t+(transformerData.LV.radialDepth+transformerData.HV.radialDepth)/3))/Lc;
+  ans.absolute = Xp;
+  ans.pu = (ans.absolute*transformerData.IpPhase)/transformerData.VpPhase;
+
+  return ans;
+}
 
 int main(int argc, char const *argv[]) {
   /* code */
@@ -383,6 +462,23 @@ int main(int argc, char const *argv[]) {
   printf("============================\n");
   transformerData.LV = lvDesign(transformerData);
 
+  //_____HV Winding__________________
+  printf("\n\n============================\n");
+  printf("            HV DESIGN       \n");
+  printf("============================\n");
+  transformerData.HV = hvDesign(transformerData);
+
+  //___________Resistance__________________
+  printf("\n\n============================\n");
+  printf("         RESISTANCE         \n");
+  printf("============================\n");
+  transformerData.Z.R = resistanceCalc(transformerData);
+
+  //___________Reactance__________________
+  printf("\n\n============================\n");
+  printf("         REACTANCE         \n");
+  printf("============================\n");
+  transformerData.Z.X = reactanceCalc(transformerData);
 
   return 0;
 }

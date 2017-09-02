@@ -53,6 +53,20 @@ typedef struct _frame{
 } Frame;
 
 typedef struct _lv{
+  int turnsPerPhase;
+  float currentDensity;
+  float As;
+  float x1;
+  float x2;
+  int layers;
+  int turnsPerLayer;
+  float axialDepth;
+  float radialDepth;
+  float Di; //Inner Dia
+  float Do; //Outer Dia
+  float conductorInsulation;
+  float clearance;
+  float pressBoard;
 
 } LVwindingData;
 
@@ -67,6 +81,15 @@ typedef struct _transformer{
   float phase; // Number of phases
   float frequency; //Obvio
   float maxTappings;
+  float VpPhase;
+  float VsPhase;
+  float Ip; //in A
+  float Is; //in A
+  float IpPhase; //in A
+  float IsPhase; //in A
+
+  int primaryType;
+  int secondaryType;
 
   Core Core;
   Window Window;
@@ -227,8 +250,64 @@ Frame frameDesign(Transformer transformerData){
   ans.W = 2*transformerData.Window.distanceBetweenCores + transformerData.Core.p;
   ans.D = transformerData.Yoke.Dy;
 
+  printf("\n => Height of Frame = %d mm",mToMM(ans.H));
+  printf("\n => Width of Frame = %d mm",mToMM(ans.W));
+  printf("\n => Depth of Frame = %d mm",mToMM(ans.D));
+
   return ans;
 }
+
+LVwindingData lvDesign(Transformer transformerData){
+  LVwindingData ans;
+  float x;
+  x = (transformerData.VsPhase*1000)/transformerData.Core.Et;
+  ans.turnsPerPhase = (int)x + 1;
+
+  readFloat("Enter the Current density for LV (in A/mm^2)",&ans.currentDensity);
+  ans.As = transformerData.IsPhase/ans.currentDensity;
+  printf("\n=> Area of Cross Section of LV winding Conductor(theoretical) = %f mm^2",ans.As);
+  printf("\nEnter the proper Conductor dimensions as per IS:1897-1962 standards(in mm) seperated by a [space] : ");
+  scanf("%f %f",&ans.x1,&ans.x2);
+  readFloat("Enter the required Insulation(in mm)",&ans.conductorInsulation);
+  ans.As = ans.x1*ans.x2;
+  ans.currentDensity = transformerData.IsPhase/ans.As;
+
+  ans.x1 += ans.conductorInsulation;
+  ans.x2 += ans.conductorInsulation;
+  printf("\n=> Dimensions of Insulated conductors = %f x %f mm",ans.x1,ans.x2);
+
+  //Helical Winding
+  printf("\n__________For Helical Winding__________");
+  readInt("Enter the number of layers",&ans.layers);
+  ans.turnsPerLayer = (int)(ans.turnsPerPhase/ans.layers) + 1;
+  printf("\nUsing Helical Winding, space is to be provided for %d turns along the axis",ans.turnsPerLayer);
+
+  //Axial Depth
+  ans.axialDepth = ans.turnsPerLayer * ans.x1;
+
+  //Radial Depth
+  ans.radialDepth= ans.layers * ans.x2 + (ans.layers-1)*ans.conductorInsulation;
+
+  //Inner Dia
+  readFloat("Enter the thickness of press board cylinder(in mm)",&ans.pressBoard);
+  ans.Di = transformerData.Core.d*1000 + 2*ans.pressBoard;
+
+  //Outer Dia
+  ans.Do = ans.Di + 2*ans.radialDepth;
+
+  //clearance
+  ans.clearance = (transformerData.Window.Hw*1000 - ans.axialDepth)/2;
+
+  printf("\n\n _____________LV Dimensions____________");
+  printf("\n=> Axial Depth of LV Windings = %f mm",ans.axialDepth);
+  printf("\n=> Clearance = %f mm on either side",ans.clearance);
+  printf("\n=> Radial Depth of LV Windings = %f mm",ans.radialDepth);
+  printf("\n=> Inner Diameter = %f mm",ans.Di);
+  printf("\n=> Outer Diameter = %f mm",ans.Do);
+
+  return ans;
+}
+
 
 int main(int argc, char const *argv[]) {
   /* code */
@@ -246,6 +325,31 @@ int main(int argc, char const *argv[]) {
   readFloat("Enter the rated frequency(in Hz)",&transformerData.frequency);
   readFloat("Enter the number of phases(1 or 3)",&transformerData.phase);
   readFloat("Enter the tappings(in %)",&transformerData.maxTappings);
+  readInt("Enter the Primary Type\n1. Delta\n2. Star",&transformerData.primaryType);
+  readInt("Enter the Secondary Type\n1. Delta\n2. Star",&transformerData.secondaryType);
+  //Line Currents
+  transformerData.Ip = transformerData.kVA/(sqrt(3)*transformerData.Vp);
+  transformerData.Is = transformerData.kVA/(sqrt(3)*transformerData.Vs);
+
+  switch(transformerData.primaryType){
+    case 1: // Primary Delta
+      transformerData.VpPhase = transformerData.Vp;
+      transformerData.IpPhase = transformerData.Ip/sqrt(3);
+
+    case 2: //Primary Star
+      transformerData.VpPhase = transformerData.Vp/sqrt(3);
+      transformerData.IpPhase = transformerData.Ip;
+  }
+
+  switch(transformerData.secondaryType){
+    case 1: // Secondary Delta
+      transformerData.VsPhase = transformerData.Vs;
+      transformerData.IsPhase = transformerData.Is/sqrt(3);
+
+    case 2: //Secondary Star
+      transformerData.VsPhase = transformerData.Vs/sqrt(3);
+      transformerData.IsPhase = transformerData.Is;
+  }
 
 
   //________Core Design__________________
@@ -272,6 +376,12 @@ int main(int argc, char const *argv[]) {
   printf("         FRAME DESIGN       \n");
   printf("============================\n");
   transformerData.Frame = frameDesign(transformerData);
+
+  //_____LV Winding__________________
+  printf("\n\n============================\n");
+  printf("            LV DESIGN       \n");
+  printf("============================\n");
+  transformerData.LV = lvDesign(transformerData);
 
 
   return 0;

@@ -179,7 +179,7 @@ Core coreDesign(Transformer transformerData){
   printf("\n=> phi_m = %.4f Wb\n",ans.phi_m);
 
   //Ai
-  readFloat("Enter the value of Bm(in Wb/m^2)\nFor Distribution Transformers,Bm=1 to 1.35 Wb/m^2\nFor Power Transformers,Bm = 1.25 to 1.45 Wb/m^2",&ans.Bm);
+  readFloat("Enter the value of Bm(in Wb/m^2)\nFor Distribution Transformers,Bm=1 to 1.35 Wb/m^2\nFor Power Transformers,Bm = 1.25 to 1.60 Wb/m^2",&ans.Bm);
   ans.Ai = ans.phi_m/ans.Bm;
   printf("\n=> Net Iron Area = %.4f m^2\n",ans.Ai);
 

@@ -71,6 +71,13 @@ typedef struct _lv{
 } LVwindingData;
 
 typedef struct _hv{
+  int turnsPerPhase;
+  float Ap;
+  float Di; //Inner Dia
+  float Do; //Outer Dia
+  float axialDepth;
+  float radialDepth;
+  float t;
 
 } HVwindingData;
 
@@ -342,7 +349,6 @@ LVwindingData lvDesign(Transformer transformerData){
   printf("\n=> Radial Depth of LV Windings = %f mm",ans.radialDepth);
   printf("\n=> Inner Diameter = %f mm",ans.Di);
   printf("\n=> Outer Diameter = %f mm",ans.Do);
-
   return ans;
 }
 
@@ -364,7 +370,7 @@ Resistance resistanceCalc(Transformer transformerData){
   Lmts = pi*Dm2*0.001;//in m
   Rs = (transformerData.LV.turnsPerPhase * 0.021 * Lmts)/transformerData.LV.As;
 
-  ans.absolute = Rp + pow((HV.turnsPerPhase/LV.turnsPerPhase),2) * Rs;
+  ans.absolute = Rp + pow((transformerData.HV.turnsPerPhase/transformerData.LV.turnsPerPhase),2) * Rs;
   ans.pu = (ans.absolute*transformerData.IpPhase)/transformerData.VpPhase;
   return ans;
 }
@@ -387,6 +393,11 @@ Reactance reactanceCalc(Transformer transformerData){
 
   return ans;
 }
+
+
+
+
+
 
 int main(int argc, char const *argv[]) {
   /* code */

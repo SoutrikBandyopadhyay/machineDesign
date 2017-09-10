@@ -79,6 +79,9 @@ typedef struct _hv{
   float radialDepth;
   float t;
 
+  float voltagePerDisc;
+
+
 } HVwindingData;
 
 typedef struct _resistance{
@@ -125,7 +128,7 @@ typedef struct _transformer{
   float IpPhase; //in A
   float IsPhase; //in A
 
-  int primaryType;
+  int primaryType; // 1 for Delta 2 for Star
   int secondaryType;
 
   Core Core;
@@ -353,7 +356,27 @@ LVwindingData lvDesign(Transformer transformerData){
 }
 
 HVwindingData hvDesign(Transformer transformerData){
+  HVwindingData ans;
 
+  //Turns per phase
+  ans.turnsPerPhase = transformerData.LV.turnsPerPhase*(transformerData.VpPhase/transformerData.VsPhase);
+  printf("\n=>HV Turns per phase = %d",ans.turnsPerPhase);
+
+  ans.turnsPerPhase *= (1+(transformerData.maxTappings/100));
+  printf("\n=>HV Turns per phase after considering tappings = %d",ans.turnsPerPhase);
+
+  //TODO- Cross Over windings
+
+
+
+
+  readFloat("Enter the value of Max Voltage per Disc (in V)",&ans.voltagePerDisc);
+
+
+
+
+
+  return ans;
 }
 
 Resistance resistanceCalc(Transformer transformerData){
@@ -414,7 +437,7 @@ int main(int argc, char const *argv[]) {
   readFloat("Enter the LV Voltage(in kV)",&transformerData.Vs);
   readFloat("Enter the rated frequency(in Hz)",&transformerData.frequency);
   readFloat("Enter the number of phases(1 or 3)",&transformerData.phase);
-  readFloat("Enter the tappings(in %)",&transformerData.maxTappings);
+  readFloat("Enter the tappings(in %)(if no tappings write 0)",&transformerData.maxTappings);
   readInt("Enter the Primary Type\n1. Delta\n2. Star",&transformerData.primaryType);
   readInt("Enter the Secondary Type\n1. Delta\n2. Star",&transformerData.secondaryType);
   //Line Currents
@@ -425,20 +448,22 @@ int main(int argc, char const *argv[]) {
     case 1: // Primary Delta
       transformerData.VpPhase = transformerData.Vp;
       transformerData.IpPhase = transformerData.Ip/sqrt(3);
-
+      break;
     case 2: //Primary Star
       transformerData.VpPhase = transformerData.Vp/sqrt(3);
       transformerData.IpPhase = transformerData.Ip;
+      break;
   }
 
   switch(transformerData.secondaryType){
     case 1: // Secondary Delta
       transformerData.VsPhase = transformerData.Vs;
       transformerData.IsPhase = transformerData.Is/sqrt(3);
-
+      break;
     case 2: //Secondary Star
       transformerData.VsPhase = transformerData.Vs/sqrt(3);
       transformerData.IsPhase = transformerData.Is;
+      break;
   }
 
 

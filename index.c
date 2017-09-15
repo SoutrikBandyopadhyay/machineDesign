@@ -44,6 +44,7 @@ typedef struct _yoke{
   float Ayoke;
   float Dy;
   float Hy;
+  float Bm;
 } Yoke;
 
 typedef struct _frame{
@@ -55,7 +56,7 @@ typedef struct _frame{
 typedef struct _lv{
   int turnsPerPhase;
   float currentDensity;
-  float As;
+  float As; //in mm^2
   float x1;
   float x2;
   int layers;
@@ -72,14 +73,24 @@ typedef struct _lv{
 
 typedef struct _hv{
   int turnsPerPhase;
-  float Ap;
+  float Ap; //in mm^2
   float Di; //Inner Dia
   float Do; //Outer Dia
+  float x1;
+  float x2;
+  float clearance;
+  float clearanceAxial;
+  float insulation;
+  float conductorInsulation;
   float axialDepth;
   float radialDepth;
   float t;
-
+  int numDiscs;
   float voltagePerDisc;
+  int turnsPerDisc;
+  float currentDensity;
+  float bakelizedPaper;
+  float spacer;
 
 
 } HVwindingData;
@@ -104,15 +115,37 @@ typedef struct _impedance{
 
 typedef struct _regulation{
   float value;
+  float pu;
   float pf;
 
 } Regulation;
 
+typedef struct _coreloss{
+  float yoke;
+  float limb;
+  float lamDensity;
+  float yokeSpec;
+  float limbSpec;
+  float yokeWeight;
+  float limbWeight;
+  float value;
+
+} CoreLoss;
+
 typedef struct _losses{
-  float CoreLoss;
+  CoreLoss CoreLoss;
   float CopperLoss;
+  float totalLoss;
 } Losses;
 
+typedef struct _tank{
+  float H;
+  float W;
+  float L;
+  float S;
+  float diss;
+  float tempRise;
+} Tank;
 
 typedef struct _transformer{
   float kVA;
@@ -143,7 +176,7 @@ typedef struct _transformer{
   Losses Losses;
   float percentLoading;
   float efficiency;
-
+  Tank Tank;
 
 } Transformer;
 
@@ -287,6 +320,9 @@ Yoke yokeDesign(Transformer transformerData){
   printf("\n => Depth of Yoke = %d mm",mToMM(ans.Dy));
   printf("\n => Height of Yoke = %d mm",mToMM(ans.Hy));
 
+  ans.Bm = transformerData.Core.Bm/1.2;
+
+
   return ans;
 }
 
@@ -365,14 +401,65 @@ HVwindingData hvDesign(Transformer transformerData){
   ans.turnsPerPhase *= (1+(transformerData.maxTappings/100));
   printf("\n=>HV Turns per phase after considering tappings = %d",ans.turnsPerPhase);
 
-  //TODO- Cross Over windings
+  readFloat("Enter the value of Current Density(HV) (in A/mm^2)",&ans.currentDensity);
+  ans.Ap = transformerData.IpPhase/ans.currentDensity;
+  printf("\n=> Area of Cross Section of HV winding Conductor(theoretical) = %f mm^2",ans.Ap);
+  printf("\nEnter the proper Conductor dimensions as per IS:1897-1962 standards(in mm) seperated by a [space] : ");
+  scanf("%f %f",&ans.x1,&ans.x2);
+  readFloat("Enter the required Insulation(in mm)",&ans.conductorInsulation);
+  ans.Ap = ans.x1*ans.x2;
+  ans.currentDensity = transformerData.IpPhase/ans.Ap;
+  ans.x1 += ans.conductorInsulation;
+  ans.x2 += ans.conductorInsulation;
+
+  printf("\n=> Dimensions of Insulated conductors = %f x %f mm",ans.x1,ans.x2);
+
+
+  printf("\n\n__________For Continuous Disc Winding__________");
+  readFloat("\nEnter the value of Maximum Voltage per Disc (in V)",&ans.voltagePerDisc);
+  ans.numDiscs = (transformerData.VpPhase*1000/ans.voltagePerDisc);
+  printf("\n\n=>Recomended number of Discs = %d\n", ans.numDiscs);
+  readInt("Enter the number of discs you require ",&ans.numDiscs);
+
+  ans.turnsPerDisc = (ans.turnsPerPhase/ans.numDiscs);
+  printf("\n=>Turns per Disc = %d\n", ans.turnsPerDisc);
+
+  readFloat("Enter the thickness of Bakelized Paper (in mm)",&ans.bakelizedPaper);
+  readFloat("Enter the thickness of Spacer (in mm)",&ans.spacer);
+
+  //Axial Depth
+  ans.axialDepth = ans.numDiscs * ans.x1 + (ans.numDiscs-1)*ans.spacer;
+
+  //Radial Depth
+  ans.radialDepth= ans.turnsPerDisc*ans.x2;
+
+  //Axial Clearance
+  ans.clearanceAxial = (transformerData.Window.Hw*1000 - ans.axialDepth)/2;
+
+  //Inner Dia
+  ans.Di = transformerData.LV.Do + 2*ans.bakelizedPaper;
+
+  //Outer Dia
+  ans.Do = ans.Di + ans.radialDepth;
+
+  //clearance
+  ans.clearance = (transformerData.Window.distanceBetweenCores*1000 - ans.Do);
+
+  //Insulation
+  ans.insulation = 5 + 0.9*transformerData.VpPhase;
 
 
 
+  printf("\n\n _____________HV Dimensions____________\n");
+  printf("\n=> Axial Depth of HV Windings = %f mm",ans.axialDepth);
+  printf("\n=> Axial Clearance = %f mm ",ans.clearanceAxial);
 
-  readFloat("Enter the value of Max Voltage per Disc (in V)",&ans.voltagePerDisc);
+  printf("\n=> Radial Depth of HV Windings = %f mm",ans.radialDepth);
+  printf("\n=> Inner Diameter = %f mm",ans.Di);
+  printf("\n=> Outer Diameter = %f mm",ans.Do);
 
-
+  printf("\n=> Clearance between windings of 2 limbs = %f mm ",ans.clearance);
+  printf("\n=> Insulation between HV and LV = %f mm ",ans.insulation);
 
 
 
@@ -393,8 +480,12 @@ Resistance resistanceCalc(Transformer transformerData){
   Lmts = pi*Dm2*0.001;//in m
   Rs = (transformerData.LV.turnsPerPhase * 0.021 * Lmts)/transformerData.LV.As;
 
-  ans.absolute = Rp + pow((transformerData.HV.turnsPerPhase/transformerData.LV.turnsPerPhase),2) * Rs;
-  ans.pu = (ans.absolute*transformerData.IpPhase)/transformerData.VpPhase;
+  ans.absolute = Rp + pow((transformerData.HV.turnsPerPhase/(transformerData.LV.turnsPerPhase*(1+transformerData.maxTappings/100))),2) * Rs;
+  ans.pu = (ans.absolute*transformerData.IpPhase)/(transformerData.VpPhase*1000);
+
+  printf("\n=> Total Resistance referred to primary = %f ohm", ans.absolute);
+  printf("\n=> Total Resistance referred to primary in p.u. = %f ", ans.pu);
+
   return ans;
 }
 
@@ -408,19 +499,104 @@ Reactance reactanceCalc(Transformer transformerData){
 
   Dm = (transformerData.LV.Di+transformerData.HV.Do)/2;
   Lmt = pi*Dm*0.001; // in m
-  Lc = (transformerData.LV.axialDepth + transformerData.HV.axialDepth)/2;
 
-  Xp = (2*pi*transformerData.frequency*muo*pow(transformerData.HV.turnsPerPhase,2)*Lmt*(transformerData.HV.t+(transformerData.LV.radialDepth+transformerData.HV.radialDepth)/3))/Lc;
+
+  Lc = (transformerData.LV.axialDepth + transformerData.HV.axialDepth)/2000;
+  Xp = (2*pi*transformerData.frequency*muo*pow(transformerData.HV.turnsPerPhase/(1+transformerData.maxTappings/100),2)*Lmt*(transformerData.HV.insulation+(transformerData.LV.radialDepth+transformerData.HV.radialDepth)/3))/(Lc*1000);
   ans.absolute = Xp;
-  ans.pu = (ans.absolute*transformerData.IpPhase)/transformerData.VpPhase;
+  ans.pu = (ans.absolute*transformerData.IpPhase)/(transformerData.VpPhase*1000);
+
+  printf("\n=> Total Reactance referred to primary = %f ohm", ans.absolute);
+  printf("\n=> Total Reactance referred to primary in p.u. = %f ", ans.pu);
+
+
+
+  return ans;
+}
+
+Regulation regulationCalc(Transformer transformerData){
+  Regulation ans;
+
+  transformerData.Z.pu = sqrt(pow(transformerData.Z.R.pu,2)+pow(transformerData.Z.X.pu,2));
+
+  readFloat("Enter the pf at which Regulation is to be calculated \n +ve for lagging \n -ve for leading ",&ans.pf);
+
+  if(ans.pf>0){ // Lag
+
+    ans.pu = transformerData.Z.R.pu * ans.pf + transformerData.Z.X.pu*sqrt(1-pow(ans.pf,2));
+
+
+
+  }else{ // Lead
+    ans.pu = -1*transformerData.Z.R.pu * ans.pf - transformerData.Z.X.pu*sqrt(1-pow(ans.pf,2));
+
+  }
+
+  printf("\n\n=> Percentage Regulation = %f",ans.pu*100);
+
 
   return ans;
 }
 
 
+Losses lossCalc(Transformer transformerData){
+  Losses ans;
+
+  printf("\n_________Copper Loss___________\n");
+
+  ans.CopperLoss = 3*pow(transformerData.IpPhase,2)*transformerData.Z.R.absolute;
+  printf("\n=> Copper Loss = %.3f kW",ans.CopperLoss/1000);
+  ans.CopperLoss *= 1.15;
+  printf("\n=> Copper Loss(considering Stray Load Loss) = %.3f kW",ans.CopperLoss/1000);
+
+  printf("\n\n_________Core Loss___________\n");
+
+  readFloat("Enter the value of Lamination Density (in kg/m^3)",&ans.CoreLoss.lamDensity);
+
+  ans.CoreLoss.limbWeight = 3*transformerData.Window.Hw*transformerData.Core.Ai*ans.CoreLoss.lamDensity;
+
+  readFloat("Enter the specific Core Loss for Limb (in W/kg)",&ans.CoreLoss.limbSpec);
+  ans.CoreLoss.limb = ans.CoreLoss.limbWeight * ans.CoreLoss.limbSpec;
+
+
+  ans.CoreLoss.yokeWeight = 2*transformerData.Frame.W * transformerData.Yoke.Ayoke*ans.CoreLoss.lamDensity;
+  readFloat("Enter the specific Core Loss for Yoke (in W/kg)",&ans.CoreLoss.yokeSpec);
+  ans.CoreLoss.yoke = ans.CoreLoss.yokeWeight * ans.CoreLoss.yokeSpec;
+
+  ans.CoreLoss.value = ans.CoreLoss.yoke + ans.CoreLoss.limb;
+
+  // printf("\n%f",ans.CoreLoss.value);
+  printf("\n\n=> Core Loss = %.3f kW",ans.CoreLoss.value/1000);
+  ans.totalLoss = ans.CoreLoss.value+ans.CopperLoss;
+
+  printf("\n\n=> Total Loss = %.3f kW",ans.totalLoss/1000);
+
+
+  return ans;
+}
+
+
+Tank tankDesign(Transformer transformerData){
+  Tank ans;
+  ans.H = transformerData.Frame.H + 0.4; // m
+  ans.W = 2*transformerData.Window.distanceBetweenCores + (transformerData.HV.Do/1000) + 0.08; // m
+  ans.L = (transformerData.HV.Do/1000) + 0.1;
+  ans.S = 2*(ans.W+ans.L)*ans.H;
+
+  readFloat("Enter the specific loss dissipiation constant (in W/m^2-*C)",&ans.diss);
+  ans.tempRise = transformerData.Losses.totalLoss/(ans.diss*ans.S);
+
+  printf("\n=> Tank Height = %.3f m", ans.H);
+  printf("\n=> Tank Width = %.3f m", ans.W);
+  printf("\n=> Tank Length = %.3f m", ans.L);
 
 
 
+
+  printf("\n\n=> Temperature Rise = %.2f *C", ans.tempRise);
+
+  return ans;
+}
 
 int main(int argc, char const *argv[]) {
   /* code */
@@ -515,6 +691,32 @@ int main(int argc, char const *argv[]) {
   printf("         REACTANCE         \n");
   printf("============================\n");
   transformerData.Z.X = reactanceCalc(transformerData);
+
+  //___________Regulation__________________
+  printf("\n\n============================\n");
+  printf("         REGULATION         \n");
+  printf("============================\n");
+  transformerData.Regulation = regulationCalc(transformerData);
+
+  //___________Losses__________________
+  printf("\n\n============================\n");
+  printf("         LOSSES         \n");
+  printf("============================\n");
+  transformerData.Losses = lossCalc(transformerData);
+
+  //___________efficiency__________________
+  printf("\n\n============================\n");
+  printf("         EFFICIENCY         \n");
+  printf("============================\n");
+  transformerData.efficiency = transformerData.kVA*1000/(transformerData.kVA*1000 + transformerData.Losses.totalLoss);
+  printf("\n\n=> Efficiency at Full Load = %.2f %%",transformerData.efficiency*100);
+
+  //___________Tank__________________
+  printf("\n\n============================\n");
+  printf("           TANK           \n");
+  printf("============================\n");
+  transformerData.Tank = tankDesign(transformerData);
+
 
   return 0;
 }
